@@ -31,6 +31,10 @@ import (
 	"math/big"
 )
 
+// ErrMismatchingAlgorithms is returned when a cryptographic operation
+// is given keys using different algorithms.
+var ErrMismatchingAlgorithms = errors.New("mismatching key algorithms")
+
 // Slot is a private key and certificate combination managed by the security key.
 type Slot struct {
 	// Key is a reference for a key type.
@@ -667,6 +671,20 @@ func (yk *YubiKey) PrivateKey(slot Slot, public crypto.PublicKey, auth KeyAuth) 
 	}
 }
 
+// KeyAgreement is an optional interface that may be implemented by
+// keys returned from YubiKey.PrivateKey.
+type KeyAgreement interface {
+	// Perform a Diffie-Hellman key agreement with the peer.
+	//
+	// Peer's public key must use the same algorithm as the key in
+	// this slot, or returns error ErrMismatchingAlgorithms.
+	//
+	// Length of the result depends on the types and sizes of the keys
+	// used for the operation. Callers should use a cryptographic key
+	// derivation function to extract the amount of bytes they need.
+	KeyAgreement(rand io.Reader, peer crypto.PublicKey, opts crypto.SignerOpts) ([]byte, error)
+}
+
 type keyECDSA struct {
 	yk   *YubiKey
 	slot Slot
@@ -682,6 +700,22 @@ func (k *keyECDSA) Public() crypto.PublicKey {
 func (k *keyECDSA) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	return k.auth.do(k.yk, k.pp, func(tx *scTx) ([]byte, error) {
 		return ykSignECDSA(tx, k.slot, k.pub, digest)
+	})
+}
+
+var _ KeyAgreement = (*keyECDSA)(nil)
+
+func (k *keyECDSA) KeyAgreement(rand io.Reader, peer crypto.PublicKey, opts crypto.SignerOpts) ([]byte, error) {
+	pub, ok := peer.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, ErrMismatchingAlgorithms
+	}
+	if pub.Curve.Params().BitSize != k.pub.Curve.Params().BitSize {
+		return nil, ErrMismatchingAlgorithms
+	}
+	msg := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
+	return k.auth.do(k.yk, k.pp, func(tx *scTx) ([]byte, error) {
+		return ykSignECDSAOrECDH(tx, k.slot, k.pub, 0x85, msg)
 	})
 }
 
@@ -727,7 +761,9 @@ func (k *keyRSA) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) 
 	})
 }
 
-func ykSignECDSA(tx *scTx, slot Slot, pub *ecdsa.PublicKey, digest []byte) ([]byte, error) {
+func ykSignECDSAOrECDH(tx *scTx, slot Slot, pub *ecdsa.PublicKey, op byte, msg []byte) ([]byte, error) {
+	// I don't know what the proper name of `op` would be.
+
 	var alg byte
 	size := pub.Params().BitSize
 	switch size {
@@ -739,13 +775,6 @@ func ykSignECDSA(tx *scTx, slot Slot, pub *ecdsa.PublicKey, digest []byte) ([]by
 		return nil, fmt.Errorf("unsupported curve: %d", size)
 	}
 
-	// Same as the standard library
-	// https://github.com/golang/go/blob/go1.13.5/src/crypto/ecdsa/ecdsa.go#L125-L128
-	orderBytes := (size + 7) / 8
-	if len(digest) > orderBytes {
-		digest = digest[:orderBytes]
-	}
-
 	// https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-73-4.pdf#page=118
 	cmd := apdu{
 		instruction: insAuthenticate,
@@ -753,7 +782,7 @@ func ykSignECDSA(tx *scTx, slot Slot, pub *ecdsa.PublicKey, digest []byte) ([]by
 		param2:      byte(slot.Key),
 		data: marshalASN1(0x7c,
 			append([]byte{0x82, 0x00},
-				marshalASN1(0x81, digest)...)),
+				marshalASN1(op, msg)...)),
 	}
 	resp, err := tx.Transmit(cmd)
 	if err != nil {
@@ -768,6 +797,18 @@ func ykSignECDSA(tx *scTx, slot Slot, pub *ecdsa.PublicKey, digest []byte) ([]by
 		return nil, fmt.Errorf("unmarshal response signature: %v", err)
 	}
 	return rs, nil
+}
+
+func ykSignECDSA(tx *scTx, slot Slot, pub *ecdsa.PublicKey, digest []byte) ([]byte, error) {
+	// Same as the standard library
+	// https://github.com/golang/go/blob/go1.13.5/src/crypto/ecdsa/ecdsa.go#L125-L128
+	size := pub.Params().BitSize
+	orderBytes := (size + 7) / 8
+	if len(digest) > orderBytes {
+		digest = digest[:orderBytes]
+	}
+
+	return ykSignECDSAOrECDH(tx, slot, pub, 0x81, digest)
 }
 
 // This function only works on SoloKeys prototypes and other PIV devices that choose
