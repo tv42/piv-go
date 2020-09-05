@@ -671,7 +671,13 @@ func (yk *YubiKey) PrivateKey(slot Slot, public crypto.PublicKey, auth KeyAuth) 
 	}
 }
 
-// ECDSAPrivateKey is used to access a ECDSA signing key.
+// ECDSAPrivateKey is a crypto.PrivateKey implementation for ECDSA
+// keys. It implements crypto.Signer and the method SharedKey performs
+// Diffie-Hellman key agreements.
+//
+// Keys returned by YubiKey.PrivateKey() may be type asserted to
+// *ECDSAPrivateKey, if the slot contains an ECDSA key. See examples
+// on SharedKey.
 type ECDSAPrivateKey struct {
 	yk   *YubiKey
 	slot Slot
@@ -684,6 +690,8 @@ type ECDSAPrivateKey struct {
 func (k *ECDSAPrivateKey) Public() crypto.PublicKey {
 	return k.pub
 }
+
+var _ crypto.Signer = (*ECDSAPrivateKey)(nil)
 
 // Sign implements crypto.Signer.
 func (k *ECDSAPrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
