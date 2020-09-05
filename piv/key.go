@@ -711,7 +711,39 @@ func (k *ECDSAPrivateKey) SharedKey(rand io.Reader, peer crypto.PublicKey, opts 
 	}
 	msg := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 	return k.auth.do(k.yk, k.pp, func(tx *scTx) ([]byte, error) {
-		return ykSignECDSAOrECDH(tx, k.slot, k.pub, 0x85, msg)
+		var alg byte
+		size := k.pub.Params().BitSize
+		switch size {
+		case 256:
+			alg = algECCP256
+		case 384:
+			alg = algECCP384
+		default:
+			return nil, fmt.Errorf("unsupported curve: %d", size)
+		}
+
+		// https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-73-4.pdf#page=118
+		cmd := apdu{
+			instruction: insAuthenticate,
+			param1:      alg,
+			param2:      byte(k.slot.Key),
+			data: marshalASN1(0x7c,
+				append([]byte{0x82, 0x00},
+					marshalASN1(0x85, msg)...)),
+		}
+		resp, err := tx.Transmit(cmd)
+		if err != nil {
+			return nil, fmt.Errorf("command failed: %w", err)
+		}
+		sig, _, err := unmarshalASN1(resp, 1, 0x1c) // 0x7c
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal response: %v", err)
+		}
+		rs, _, err := unmarshalASN1(sig, 2, 0x02) // 0x82
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal response signature: %v", err)
+		}
+		return rs, nil
 	})
 }
 
@@ -757,9 +789,7 @@ func (k *keyRSA) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) 
 	})
 }
 
-func ykSignECDSAOrECDH(tx *scTx, slot Slot, pub *ecdsa.PublicKey, op byte, msg []byte) ([]byte, error) {
-	// I don't know what the proper name of `op` would be.
-
+func ykSignECDSA(tx *scTx, slot Slot, pub *ecdsa.PublicKey, digest []byte) ([]byte, error) {
 	var alg byte
 	size := pub.Params().BitSize
 	switch size {
@@ -771,6 +801,13 @@ func ykSignECDSAOrECDH(tx *scTx, slot Slot, pub *ecdsa.PublicKey, op byte, msg [
 		return nil, fmt.Errorf("unsupported curve: %d", size)
 	}
 
+	// Same as the standard library
+	// https://github.com/golang/go/blob/go1.13.5/src/crypto/ecdsa/ecdsa.go#L125-L128
+	orderBytes := (size + 7) / 8
+	if len(digest) > orderBytes {
+		digest = digest[:orderBytes]
+	}
+
 	// https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-73-4.pdf#page=118
 	cmd := apdu{
 		instruction: insAuthenticate,
@@ -778,7 +815,7 @@ func ykSignECDSAOrECDH(tx *scTx, slot Slot, pub *ecdsa.PublicKey, op byte, msg [
 		param2:      byte(slot.Key),
 		data: marshalASN1(0x7c,
 			append([]byte{0x82, 0x00},
-				marshalASN1(op, msg)...)),
+				marshalASN1(0x81, digest)...)),
 	}
 	resp, err := tx.Transmit(cmd)
 	if err != nil {
@@ -793,18 +830,6 @@ func ykSignECDSAOrECDH(tx *scTx, slot Slot, pub *ecdsa.PublicKey, op byte, msg [
 		return nil, fmt.Errorf("unmarshal response signature: %v", err)
 	}
 	return rs, nil
-}
-
-func ykSignECDSA(tx *scTx, slot Slot, pub *ecdsa.PublicKey, digest []byte) ([]byte, error) {
-	// Same as the standard library
-	// https://github.com/golang/go/blob/go1.13.5/src/crypto/ecdsa/ecdsa.go#L125-L128
-	size := pub.Params().BitSize
-	orderBytes := (size + 7) / 8
-	if len(digest) > orderBytes {
-		digest = digest[:orderBytes]
-	}
-
-	return ykSignECDSAOrECDH(tx, slot, pub, 0x81, digest)
 }
 
 // This function only works on SoloKeys prototypes and other PIV devices that choose
