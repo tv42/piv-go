@@ -130,8 +130,8 @@ func TestYubiKeyECDSAKeyAgreement(t *testing.T) {
 				t.Fatalf("cannot generate key: %v", err)
 			}
 			_, err = agr.KeyAgreement(rand.Reader, &eph.PublicKey, crypto.SHA256)
-			if !errors.Is(err, ErrMismatchingAlgorithms) {
-				t.Fatalf("unexpected error value: wanted ErrMismatchingAlgorithms: %v", err)
+			if !errors.Is(err, errMismatchingAlgorithms) {
+				t.Fatalf("unexpected error value: wanted errMismatchingAlgorithms: %v", err)
 			}
 		})
 
@@ -141,8 +141,8 @@ func TestYubiKeyECDSAKeyAgreement(t *testing.T) {
 				t.Fatalf("cannot generate key: %v", err)
 			}
 			_, err = agr.KeyAgreement(rand.Reader, &eph.PublicKey, crypto.SHA256)
-			if !errors.Is(err, ErrMismatchingAlgorithms) {
-				t.Fatalf("unexpected error value: wanted ErrMismatchingAlgorithms: %v", err)
+			if !errors.Is(err, errMismatchingAlgorithms) {
+				t.Fatalf("unexpected error value: wanted errMismatchingAlgorithms: %v", err)
 			}
 		})
 	})

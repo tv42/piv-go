@@ -31,9 +31,9 @@ import (
 	"math/big"
 )
 
-// ErrMismatchingAlgorithms is returned when a cryptographic operation
+// errMismatchingAlgorithms is returned when a cryptographic operation
 // is given keys using different algorithms.
-var ErrMismatchingAlgorithms = errors.New("mismatching key algorithms")
+var errMismatchingAlgorithms = errors.New("mismatching key algorithms")
 
 // Slot is a private key and certificate combination managed by the security key.
 type Slot struct {
@@ -677,7 +677,7 @@ type KeyAgreement interface {
 	// Perform a Diffie-Hellman key agreement with the peer.
 	//
 	// Peer's public key must use the same algorithm as the key in
-	// this slot, or returns error ErrMismatchingAlgorithms.
+	// this slot, or returns error errMismatchingAlgorithms.
 	//
 	// Length of the result depends on the types and sizes of the keys
 	// used for the operation. Callers should use a cryptographic key
@@ -708,10 +708,10 @@ var _ KeyAgreement = (*keyECDSA)(nil)
 func (k *keyECDSA) KeyAgreement(rand io.Reader, peer crypto.PublicKey, opts crypto.SignerOpts) ([]byte, error) {
 	pub, ok := peer.(*ecdsa.PublicKey)
 	if !ok {
-		return nil, ErrMismatchingAlgorithms
+		return nil, errMismatchingAlgorithms
 	}
 	if pub.Curve.Params().BitSize != k.pub.Curve.Params().BitSize {
-		return nil, ErrMismatchingAlgorithms
+		return nil, errMismatchingAlgorithms
 	}
 	msg := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 	return k.auth.do(k.yk, k.pp, func(tx *scTx) ([]byte, error) {
