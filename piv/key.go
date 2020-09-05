@@ -685,6 +685,7 @@ type KeyAgreement interface {
 	KeyAgreement(rand io.Reader, peer crypto.PublicKey, opts crypto.SignerOpts) ([]byte, error)
 }
 
+// ECDSAPrivateKey is used to access a ECDSA signing key.
 type ECDSAPrivateKey struct {
 	yk   *YubiKey
 	slot Slot
@@ -693,10 +694,12 @@ type ECDSAPrivateKey struct {
 	pp   PINPolicy
 }
 
+// Public returns the public key associated with this private key.
 func (k *ECDSAPrivateKey) Public() crypto.PublicKey {
 	return k.pub
 }
 
+// Sign implements crypto.Signer.
 func (k *ECDSAPrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	return k.auth.do(k.yk, k.pp, func(tx *scTx) ([]byte, error) {
 		return ykSignECDSA(tx, k.slot, k.pub, digest)
@@ -705,6 +708,14 @@ func (k *ECDSAPrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.Signer
 
 var _ KeyAgreement = (*ECDSAPrivateKey)(nil)
 
+// KeyAgreement performs a Diffie-Hellman key agreement with the peer.
+//
+// Peer's public key must use the same algorithm as the key in
+// this slot, or an error will be returned.
+//
+// Length of the result depends on the types and sizes of the keys
+// used for the operation. Callers should use a cryptographic key
+// derivation function to extract the amount of bytes they need.
 func (k *ECDSAPrivateKey) KeyAgreement(rand io.Reader, peer crypto.PublicKey, opts crypto.SignerOpts) ([]byte, error) {
 	pub, ok := peer.(*ecdsa.PublicKey)
 	if !ok {
