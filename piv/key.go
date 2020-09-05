@@ -661,7 +661,7 @@ func (yk *YubiKey) PrivateKey(slot Slot, public crypto.PublicKey, auth KeyAuth) 
 
 	switch pub := public.(type) {
 	case *ecdsa.PublicKey:
-		return &keyECDSA{yk, slot, pub, auth, pp}, nil
+		return &ECDSAPrivateKey{yk, slot, pub, auth, pp}, nil
 	case ed25519.PublicKey:
 		return &keyEd25519{yk, slot, pub, auth, pp}, nil
 	case *rsa.PublicKey:
@@ -685,7 +685,7 @@ type KeyAgreement interface {
 	KeyAgreement(rand io.Reader, peer crypto.PublicKey, opts crypto.SignerOpts) ([]byte, error)
 }
 
-type keyECDSA struct {
+type ECDSAPrivateKey struct {
 	yk   *YubiKey
 	slot Slot
 	pub  *ecdsa.PublicKey
@@ -693,19 +693,19 @@ type keyECDSA struct {
 	pp   PINPolicy
 }
 
-func (k *keyECDSA) Public() crypto.PublicKey {
+func (k *ECDSAPrivateKey) Public() crypto.PublicKey {
 	return k.pub
 }
 
-func (k *keyECDSA) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+func (k *ECDSAPrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	return k.auth.do(k.yk, k.pp, func(tx *scTx) ([]byte, error) {
 		return ykSignECDSA(tx, k.slot, k.pub, digest)
 	})
 }
 
-var _ KeyAgreement = (*keyECDSA)(nil)
+var _ KeyAgreement = (*ECDSAPrivateKey)(nil)
 
-func (k *keyECDSA) KeyAgreement(rand io.Reader, peer crypto.PublicKey, opts crypto.SignerOpts) ([]byte, error) {
+func (k *ECDSAPrivateKey) KeyAgreement(rand io.Reader, peer crypto.PublicKey, opts crypto.SignerOpts) ([]byte, error) {
 	pub, ok := peer.(*ecdsa.PublicKey)
 	if !ok {
 		return nil, errMismatchingAlgorithms
