@@ -701,7 +701,7 @@ func (k *ECDSAPrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.Signer
 // Length of the result depends on the types and sizes of the keys
 // used for the operation. Callers should use a cryptographic key
 // derivation function to extract the amount of bytes they need.
-func (k *ECDSAPrivateKey) SharedKey(rand io.Reader, peer crypto.PublicKey, opts crypto.SignerOpts) ([]byte, error) {
+func (k *ECDSAPrivateKey) SharedKey(peer crypto.PublicKey) ([]byte, error) {
 	pub, ok := peer.(*ecdsa.PublicKey)
 	if !ok {
 		return nil, errMismatchingAlgorithms
