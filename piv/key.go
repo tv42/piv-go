@@ -671,20 +671,6 @@ func (yk *YubiKey) PrivateKey(slot Slot, public crypto.PublicKey, auth KeyAuth) 
 	}
 }
 
-// KeyAgreement is an optional interface that may be implemented by
-// keys returned from YubiKey.PrivateKey.
-type KeyAgreement interface {
-	// Perform a Diffie-Hellman key agreement with the peer.
-	//
-	// Peer's public key must use the same algorithm as the key in
-	// this slot, or returns error errMismatchingAlgorithms.
-	//
-	// Length of the result depends on the types and sizes of the keys
-	// used for the operation. Callers should use a cryptographic key
-	// derivation function to extract the amount of bytes they need.
-	KeyAgreement(rand io.Reader, peer crypto.PublicKey, opts crypto.SignerOpts) ([]byte, error)
-}
-
 // ECDSAPrivateKey is used to access a ECDSA signing key.
 type ECDSAPrivateKey struct {
 	yk   *YubiKey
@@ -705,8 +691,6 @@ func (k *ECDSAPrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.Signer
 		return ykSignECDSA(tx, k.slot, k.pub, digest)
 	})
 }
-
-var _ KeyAgreement = (*ECDSAPrivateKey)(nil)
 
 // KeyAgreement performs a Diffie-Hellman key agreement with the peer.
 //

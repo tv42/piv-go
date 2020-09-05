@@ -101,9 +101,9 @@ func TestYubiKeyECDSAKeyAgreement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getting private key: %v", err)
 	}
-	agr, ok := priv.(KeyAgreement)
+	privECDSA, ok := priv.(*ECDSAPrivateKey)
 	if !ok {
-		t.Fatalf("expected private key to implement KeyAgreement")
+		t.Fatalf("expected private key to be ECDSA private key")
 	}
 
 	t.Run("good", func(t *testing.T) {
@@ -114,7 +114,7 @@ func TestYubiKeyECDSAKeyAgreement(t *testing.T) {
 		mult, _ := pub.ScalarMult(pub.X, pub.Y, eph.D.Bytes())
 		secret1 := mult.Bytes()
 
-		secret2, err := agr.KeyAgreement(rand.Reader, &eph.PublicKey, crypto.SHA256)
+		secret2, err := privECDSA.KeyAgreement(rand.Reader, &eph.PublicKey, crypto.SHA256)
 		if err != nil {
 			t.Fatalf("key agreement failed: %v", err)
 		}
@@ -129,7 +129,7 @@ func TestYubiKeyECDSAKeyAgreement(t *testing.T) {
 			if err != nil {
 				t.Fatalf("cannot generate key: %v", err)
 			}
-			_, err = agr.KeyAgreement(rand.Reader, &eph.PublicKey, crypto.SHA256)
+			_, err = privECDSA.KeyAgreement(rand.Reader, &eph.PublicKey, crypto.SHA256)
 			if !errors.Is(err, errMismatchingAlgorithms) {
 				t.Fatalf("unexpected error value: wanted errMismatchingAlgorithms: %v", err)
 			}
@@ -140,7 +140,7 @@ func TestYubiKeyECDSAKeyAgreement(t *testing.T) {
 			if err != nil {
 				t.Fatalf("cannot generate key: %v", err)
 			}
-			_, err = agr.KeyAgreement(rand.Reader, &eph.PublicKey, crypto.SHA256)
+			_, err = privECDSA.KeyAgreement(rand.Reader, &eph.PublicKey, crypto.SHA256)
 			if !errors.Is(err, errMismatchingAlgorithms) {
 				t.Fatalf("unexpected error value: wanted errMismatchingAlgorithms: %v", err)
 			}
