@@ -723,6 +723,7 @@ func (k *ECDSAPrivateKey) SharedKey(peer crypto.PublicKey) ([]byte, error) {
 		}
 
 		// https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-73-4.pdf#page=118
+		// https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-73-4.pdf#page=93
 		cmd := apdu{
 			instruction: insAuthenticate,
 			param1:      alg,
