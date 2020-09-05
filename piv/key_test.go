@@ -82,10 +82,6 @@ func TestYubiKeyECDSAKeyAgreement(t *testing.T) {
 	yk, close := newTestYubiKey(t)
 	defer close()
 
-	if err := yk.Reset(); err != nil {
-		t.Fatalf("reset yubikey: %v", err)
-	}
-
 	slot := SlotAuthentication
 
 	key := Key{
