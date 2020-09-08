@@ -114,7 +114,7 @@ func TestYubiKeyECDSASharedKey(t *testing.T) {
 		mult, _ := pub.ScalarMult(pub.X, pub.Y, eph.D.Bytes())
 		secret1 := mult.Bytes()
 
-		secret2, err := privECDSA.SharedKey(eph.PublicKey)
+		secret2, err := privECDSA.SharedKey(&eph.PublicKey)
 		if err != nil {
 			t.Fatalf("key agreement failed: %v", err)
 		}
@@ -124,23 +124,12 @@ func TestYubiKeyECDSASharedKey(t *testing.T) {
 	})
 
 	t.Run("bad", func(t *testing.T) {
-		t.Run("type", func(t *testing.T) {
-			eph, err := rsa.GenerateKey(rand.Reader, 2048)
-			if err != nil {
-				t.Fatalf("cannot generate key: %v", err)
-			}
-			_, err = privECDSA.SharedKey(eph.PublicKey)
-			if !errors.Is(err, errMismatchingAlgorithms) {
-				t.Fatalf("unexpected error value: wanted errMismatchingAlgorithms: %v", err)
-			}
-		})
-
 		t.Run("size", func(t *testing.T) {
 			eph, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 			if err != nil {
 				t.Fatalf("cannot generate key: %v", err)
 			}
-			_, err = privECDSA.SharedKey(eph.PublicKey)
+			_, err = privECDSA.SharedKey(&eph.PublicKey)
 			if !errors.Is(err, errMismatchingAlgorithms) {
 				t.Fatalf("unexpected error value: wanted errMismatchingAlgorithms: %v", err)
 			}

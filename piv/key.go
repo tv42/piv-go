@@ -708,15 +708,11 @@ func (k *ECDSAPrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.Signer
 // Length of the result depends on the types and sizes of the keys
 // used for the operation. Callers should use a cryptographic key
 // derivation function to extract the amount of bytes they need.
-func (k *ECDSAPrivateKey) SharedKey(peer crypto.PublicKey) ([]byte, error) {
-	pub, ok := peer.(*ecdsa.PublicKey)
-	if !ok {
+func (k *ECDSAPrivateKey) SharedKey(peer *ecdsa.PublicKey) ([]byte, error) {
+	if peer.Curve.Params().BitSize != k.pub.Curve.Params().BitSize {
 		return nil, errMismatchingAlgorithms
 	}
-	if pub.Curve.Params().BitSize != k.pub.Curve.Params().BitSize {
-		return nil, errMismatchingAlgorithms
-	}
-	msg := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
+	msg := elliptic.Marshal(peer.Curve, peer.X, peer.Y)
 	return k.auth.do(k.yk, k.pp, func(tx *scTx) ([]byte, error) {
 		var alg byte
 		size := k.pub.Params().BitSize
