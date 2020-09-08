@@ -676,8 +676,7 @@ func (yk *YubiKey) PrivateKey(slot Slot, public crypto.PublicKey, auth KeyAuth) 
 // Diffie-Hellman key agreements.
 //
 // Keys returned by YubiKey.PrivateKey() may be type asserted to
-// *ECDSAPrivateKey, if the slot contains an ECDSA key. See examples
-// on SharedKey.
+// *ECDSAPrivateKey, if the slot contains an ECDSA key.
 type ECDSAPrivateKey struct {
 	yk   *YubiKey
 	slot Slot
